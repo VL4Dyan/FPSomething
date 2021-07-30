@@ -15,5 +15,5 @@ class FPSOMETHING_API UFPSmthAbilitySystemComponent : public UAbilitySystemCompo
 	GENERATED_BODY()
 	
 public:
-	bool CharacterAbilitiesGiven = false;
+	bool bCharacterAbilitiesGiven = false;
 };

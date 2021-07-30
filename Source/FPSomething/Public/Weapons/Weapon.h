@@ -31,13 +31,10 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "FPSomething|Weapon")
 		FWeaponAmmoChangedDelegate OnClipAmmoChanged;
-
 	UPROPERTY(BlueprintAssignable, Category = "FPSomething|Weapon")
 		FWeaponAmmoChangedDelegate OnReserveAmmoChanged;
-
 	UPROPERTY(BlueprintAssignable, Category = "FPSomething|Weapon")
 		FWeaponAmmoChangedDelegate OnMaxClipAmmoChanged;
-
 	UPROPERTY(BlueprintAssignable, Category = "FPSomething|Weapon")
 		FWeaponAmmoChangedDelegate OnMaxReserveAmmoChanged;
 
@@ -78,16 +75,16 @@ public:
 		virtual int32 GetMaxReserveAmmo() const;
 
 	UFUNCTION(BlueprintCallable, Category = "FPSomething|Weapon")
-		virtual void SetClipAmmo(int32 NewPrimaryClipAmmo);
+		virtual void SetClipAmmo(int32 NewClipAmmo);
 
 	UFUNCTION(BlueprintCallable, Category = "FPSomething|Weapon")
-		virtual void SetMaxClipAmmo(int32 NewMaxPrimaryClipAmmo);
+		virtual void SetMaxClipAmmo(int32 NewMaxClipAmmo);
 
 	UFUNCTION(BlueprintCallable, Category = "FPSomething|Weapon")
-		virtual void SetReserveAmmo(int32 NewMaxPrimaryClipAmmo);
+		virtual void SetReserveAmmo(int32 NewReserveAmmo);
 
 	UFUNCTION(BlueprintCallable, Category = "FPSomething|Weapon")
-		virtual void SetMaxReserveAmmo(int32 NewMaxPrimaryClipAmmo);
+		virtual void SetMaxReserveAmmo(int32 NewMaxReserveAmmo);
 
 	UFUNCTION(BlueprintCallable, Category = "FPSomething|Animation")
 		UAnimMontage* GetEquip1PMontage() const;
@@ -115,55 +112,51 @@ protected:
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_MaxReserveAmmo, Category = "FPSomething|Weapon|Ammo")
 		int32 MaxReserveAmmo;
 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "GASShooter|GSWeapon|Ammo")
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "FPSomething|Weapon|Ammo")
 		bool bInfiniteAmmo;
 
 	UPROPERTY()
 		AGATA_Trace* LineTraceTargetActor;
 
-	// Collision capsule for when weapon is in pickup mode
-	UPROPERTY(VisibleAnywhere)
-		class UCapsuleComponent* CollisionComp;
-
-	UPROPERTY(VisibleAnywhere, Category = "GASShooter|GSWeapon")
+	UPROPERTY(VisibleAnywhere, Category = "FPSomething|Weapon")
 		USkeletalMeshComponent* WeaponMesh1P;
 
-	UPROPERTY(VisibleAnywhere, Category = "GASShooter|GSWeapon")
+	UPROPERTY(VisibleAnywhere, Category = "FPSomething|Weapon")
 		USkeletalMeshComponent* WeaponMesh3P;
 
 	// Relative Location of weapon 3P Mesh when in pickup mode
 	// 1P weapon mesh is invisible so it doesn't need one
-	UPROPERTY(EditDefaultsOnly, Category = "GASShooter|GSWeapon")
+	UPROPERTY(EditDefaultsOnly, Category = "FPSomething|Weapon")
 		FVector WeaponMesh3PickupRelativeLocation;
 
 	// Relative Location of weapon 1P Mesh when equipped
-	UPROPERTY(EditDefaultsOnly, Category = "GASShooter|GSWeapon")
+	UPROPERTY(EditDefaultsOnly, Category = "FPSomething|Weapon")
 		FVector WeaponMesh1PEquippedRelativeLocation;
 
 	// Relative Location of weapon 3P Mesh when equipped
-	UPROPERTY(EditDefaultsOnly, Category = "GASShooter|GSWeapon")
+	UPROPERTY(EditDefaultsOnly, Category = "FPSomething|Weapon")
 		FVector WeaponMesh3PEquippedRelativeLocation;
 
-	UPROPERTY(BlueprintReadOnly, Replicated, Category = "GASShooter|GSWeapon")
+	UPROPERTY(BlueprintReadOnly, Replicated, Category = "FPSomething|Weapon")
 		ACharacterBase* OwningCharacter;
 
-	UPROPERTY(EditAnywhere, Category = "GASShooter|GSWeapon")
+	UPROPERTY(EditAnywhere, Category = "FPSomething|Weapon")
 		TArray<TSubclassOf<UFPSmthGameplayAbility>> Abilities;
 
-	UPROPERTY(BlueprintReadOnly, Category = "GASShooter|GSWeapon")
+	UPROPERTY(BlueprintReadOnly, Category = "FPSomething|Weapon")
 		TArray<FGameplayAbilitySpecHandle> AbilitySpecHandles;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "GASShooter|GSWeapon")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "FPSomething|Weapon")
 		FGameplayTag DefaultFireMode;
 
 	// Things like fire mode for rifle
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "GASShooter|GSWeapon")
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "FPSomething|Weapon")
 		FText DefaultStatusText;
 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "GASShooter|Animation")
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "FPSomething|Weapon")
 		UAnimMontage* Equip1PMontage;
 
-	UPROPERTY(BlueprintReadonly, EditAnywhere, Category = "GASShooter|Animation")
+	UPROPERTY(BlueprintReadonly, EditAnywhere, Category = "FPSomething|Weapon")
 		UAnimMontage* Equip3PMontage;
 
 	// Cache tags

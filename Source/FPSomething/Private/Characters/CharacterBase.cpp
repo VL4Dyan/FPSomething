@@ -5,7 +5,9 @@
 #include "Characters/CustomMovementComponent.h"
 #include "GameFramework/PlayerState.h"
 #include "Weapons/Weapon.h"
+#include "Components/CapsuleComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Characters/Abilities/FPSmthAbilitySystemComponent.h"
 #include "Characters/Abilities/FPSmthGameplayAbility.h"
 
 ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
@@ -40,9 +42,26 @@ UAbilitySystemComponent* ACharacterBase::GetAbilitySystemComponent() const
 	return AbilitySystemComponent;
 }
 
+void ACharacterBase::AddCharacterAbilities()
+{
+	// Grant abilities, but only on the server
+	if (GetLocalRole() != ROLE_Authority || !IsValid(AbilitySystemComponent) || AbilitySystemComponent->bCharacterAbilitiesGiven)
+	{
+		return;
+	}
+
+	for (TSubclassOf<UFPSmthGameplayAbility>& StartupAbility : CharacterAbilities)
+	{
+		AbilitySystemComponent->GiveAbility(
+			FGameplayAbilitySpec(StartupAbility, 1, static_cast<int32>(StartupAbility.GetDefaultObject()->AbilityInputID), this));
+	}
+
+	AbilitySystemComponent->bCharacterAbilitiesGiven = true;
+}
+
 void ACharacterBase::RemoveCharacterAbilities()
 {
-	if (GetLocalRole() != ROLE_Authority || !IsValid(AbilitySystemComponent) || !AbilitySystemComponent->CharacterAbilitiesGiven)
+	if (GetLocalRole() != ROLE_Authority || !IsValid(AbilitySystemComponent) || !AbilitySystemComponent->bCharacterAbilitiesGiven)
 	{
 		return;
 	}
@@ -61,7 +80,7 @@ void ACharacterBase::RemoveCharacterAbilities()
 		AbilitySystemComponent->ClearAbility(AbilitiesToRemove[i]);
 	}
 
-	AbilitySystemComponent->CharacterAbilitiesGiven = false;
+	AbilitySystemComponent->bCharacterAbilitiesGiven = false;
 }
 
 AWeapon* ACharacterBase::GetCurrentWeapon() const
@@ -82,6 +101,35 @@ USkeletalMeshComponent* ACharacterBase::GetFirstPersonMesh() const
 USkeletalMeshComponent* ACharacterBase::GetThirdPersonMesh() const
 {
 	return GetMesh();
+}
+
+void ACharacterBase::Die()
+{
+	// Only runs on Server
+	RemoveCharacterAbilities();
+
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetCharacterMovement()->GravityScale = 0;
+	GetCharacterMovement()->Velocity = FVector(0);
+
+	OnCharacterDied.Broadcast(this);
+
+	if (IsValid(AbilitySystemComponent))
+	{
+		AbilitySystemComponent->CancelAllAbilities();
+
+		FGameplayTagContainer EffectTagsToRemove;
+		int32 NumEffectsRemoved = AbilitySystemComponent->RemoveActiveEffectsWithTags(EffectTagsToRemove);
+
+		AbilitySystemComponent->AddLooseGameplayTag(DeadTag);
+	}
+	
+	FinishDying();
+}
+
+void ACharacterBase::FinishDying()
+{
+	Destroy();
 }
 
 void ACharacterBase::SetCurrentWeapon(AWeapon* NewWeapon, AWeapon* LastWeapon)

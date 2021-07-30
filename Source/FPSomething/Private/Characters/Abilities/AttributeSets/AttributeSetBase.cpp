@@ -14,10 +14,8 @@ UAttributeSetBase::UAttributeSetBase()
 
 void UAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
-	// This is called whenever attributes change, so for max health/mana we want to scale the current totals to match
 	Super::PreAttributeChange(Attribute, NewValue);
 
-	// If a Max value changes, adjust current to keep Current % of Current to Max
 	if (Attribute == GetMaxHealthAttribute()) // GetMaxHealthAttribute comes from the Macros defined at the top of the header
 	{
 		AdjustAttributeForMaxChange(Health, MaxHealth, NewValue, GetHealthAttribute());
@@ -133,4 +131,9 @@ void UAttributeSetBase::OnRep_HealthRegenRate(const FGameplayAttributeData& OldH
 void UAttributeSetBase::OnRep_MoveSpeed(const FGameplayAttributeData& OldMoveSpeed)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UAttributeSetBase, MoveSpeed, OldMoveSpeed);
+}
+
+void UAttributeSetBase::OnRep_MaxJumps(const FGameplayAttributeData& OldMaxJumps)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UAttributeSetBase, MaxJumps, OldMaxJumps);
 }

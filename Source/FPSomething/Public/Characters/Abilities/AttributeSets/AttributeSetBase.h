@@ -30,27 +30,26 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	// Current Health, when 0 we expect owner to die unless prevented by an ability. Capped by MaxHealth.
-	// Positive changes can directly use this.
-	// Negative changes to Health should go through Damage meta attribute.
 	UPROPERTY(BlueprintReadOnly, Category = "Health", ReplicatedUsing = OnRep_Health)
 		FGameplayAttributeData Health;
 	ATTRIBUTE_ACCESSORS(UAttributeSetBase, Health)
 
-		// MaxHealth is its own attribute since GameplayEffects may modify it
 		UPROPERTY(BlueprintReadOnly, Category = "Health", ReplicatedUsing = OnRep_MaxHealth)
 		FGameplayAttributeData MaxHealth;
 	ATTRIBUTE_ACCESSORS(UAttributeSetBase, MaxHealth)
 
-		// Health regen rate will passively increase Health every second
 		UPROPERTY(BlueprintReadOnly, Category = "Health", ReplicatedUsing = OnRep_HealthRegenRate)
 		FGameplayAttributeData HealthRegenRate;
 	ATTRIBUTE_ACCESSORS(UAttributeSetBase, HealthRegenRate)
 
-		// MoveSpeed affects how fast characters can move.
 		UPROPERTY(BlueprintReadOnly, Category = "MoveSpeed", ReplicatedUsing = OnRep_MoveSpeed)
 		FGameplayAttributeData MoveSpeed;
 	ATTRIBUTE_ACCESSORS(UAttributeSetBase, MoveSpeed)
+
+		//Maximum number of jumps before the character touches a surface
+		UPROPERTY(BlueprintReadOnly, Category = "MaxJumps")
+		FGameplayAttributeData MaxJumps;
+	ATTRIBUTE_ACCESSORS(UAttributeSetBase, MaxJumps)
 
 protected:
 	// Helper function to proportionally adjust the value of an attribute when it's associated max attribute changes.
@@ -72,4 +71,7 @@ protected:
 
 	UFUNCTION()
 		virtual void OnRep_MoveSpeed(const FGameplayAttributeData& OldMoveSpeed);
+
+	UFUNCTION()
+		virtual void OnRep_MaxJumps(const FGameplayAttributeData& OldMaxJumps);
 };

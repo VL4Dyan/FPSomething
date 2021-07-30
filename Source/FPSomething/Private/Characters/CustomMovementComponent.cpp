@@ -42,6 +42,11 @@ void UCustomMovementComponent::TurnOffSlowFall()
 	RequestToTurnOnSlowFall = false;
 }
 
+void UCustomMovementComponent::SetMaxJumps(int32 NewMaxJumps)
+{
+	MaxJumpApexAttemptsPerSimulation = NewMaxJumps;
+}
+
 void UCustomMovementComponent::FCustomSavedMove::Clear()
 {
 	Super::Clear();

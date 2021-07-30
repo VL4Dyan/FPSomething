@@ -58,6 +58,8 @@ public:
 		void TurnOffSlowFall();
 	UFUNCTION(BlueprintCallable)
 		bool CanTurnOnSlowFall() const;
+	UFUNCTION(BlueprintCallable)
+		void SetMaxJumps(int32 NewMaxJumps);
 
 
 };
