@@ -6,6 +6,7 @@
 #include "GameFramework/PlayerState.h"
 #include "Weapons/Weapon.h"
 #include "Components/CapsuleComponent.h"
+#include "Kismet/KismetMathLibrary.h"
 #include "Net/UnrealNetwork.h"
 #include "Characters/Abilities/FPSmthAbilitySystemComponent.h"
 #include "Characters/Abilities/FPSmthGameplayAbility.h"
@@ -15,9 +16,30 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 {
 	PrimaryActorTick.bCanEverTick = false;
 	bChangedWeaponLocally = false;
+
 	AbilitySystemComponent = CreateDefaultSubobject<UFPSmthAbilitySystemComponent>(TEXT("Ability System Component"));
 	AbilitySystemComponent->SetIsReplicated(true);
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
+
+	FPCamera = CreateDefaultSubobject<UCameraComponent>(FName("FirstPersonCamera"));
+	FPCamera->SetupAttachment(RootComponent);
+	FPCamera->bUsePawnControlRotation = true;
+
+	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(FName("FirstPersonMesh"));
+	FirstPersonMesh->SetupAttachment(FPCamera);
+	FirstPersonMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	FirstPersonMesh->SetCollisionProfileName(FName("NoCollision"));
+	FirstPersonMesh->bReceivesDecals = false;
+	FirstPersonMesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
+	FirstPersonMesh->CastShadow = false;
+	FirstPersonMesh->SetVisibility(false, true);
+
+	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
+	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetMesh()->SetCollisionProfileName(FName("NoCollision"));
+	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
+	GetMesh()->bCastHiddenShadow = true;
+	GetMesh()->bReceivesDecals = false;
 
 	AttributeSet = CreateDefaultSubobject<UAttributeSetBase>(TEXT("BaseAttributeSet"));
 }
@@ -26,8 +48,77 @@ void ACharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
+	PlayerInputComponent->BindAxis("MoveForward", this, &ACharacterBase::MoveForward);
+	PlayerInputComponent->BindAxis("MoveRight", this, &ACharacterBase::MoveRight);
+	PlayerInputComponent->BindAxis("LookUp", this, &ACharacterBase::LookUp);
+	PlayerInputComponent->BindAxis("Turn", this, &ACharacterBase::Turn);
+
 	AbilitySystemComponent->BindAbilityActivationToInputComponent(InputComponent, FGameplayAbilityInputBinds(FString("ConfirmTarget"),
 		FString("CancelTarget"), FString("EAbilityInputID"), static_cast<int32>(EAbilityInputID::MainAttack), static_cast<int32>(EAbilityInputID::AltAttack)));
+}
+
+void ACharacterBase::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+
+	SetDefaultPlayerPerspective();
+}
+
+void ACharacterBase::SetDefaultPlayerPerspective()
+{
+	APlayerController* PC = Cast<APlayerController>(GetController());
+
+	if (PC && PC->IsLocalController())
+	{
+		FirstPersonMesh->SetVisibility(true, true);
+		GetMesh()->SetVisibility(false, true);
+	}
+}
+
+void ACharacterBase::SetLoadoutWeaponry()
+{
+	if (GetLocalRole() < ROLE_Authority)
+	{
+		return;
+	}
+
+	int32 NumWeaponClasses = CharacterLoadoutWeaponry.Num();
+	for (int32 i = 0; i < NumWeaponClasses; i++)
+	{
+		AWeapon* NewWeapon = GetWorld()->SpawnActorDeferred<AWeapon>(CharacterLoadoutWeaponry[i],
+			FTransform::Identity, this, this, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		NewWeapon->FinishSpawning(FTransform::Identity);
+
+		bool bEquipFirstWeapon = i == 0;
+		AddWeaponToCharacter(NewWeapon, bEquipFirstWeapon);
+	}
+}
+
+void ACharacterBase::MoveForward(float Value)
+{
+	AddMovementInput(UKismetMathLibrary::GetForwardVector(FRotator(0, GetControlRotation().Yaw, 0)), Value);
+}
+
+void ACharacterBase::MoveRight(float Value)
+{
+	AddMovementInput(UKismetMathLibrary::GetRightVector(FRotator(0, GetControlRotation().Yaw, 0)), Value);
+}
+
+void ACharacterBase::LookUp(float Value)
+{
+	AddControllerPitchInput(Value);
+}
+
+void ACharacterBase::Turn(float Value)
+{
+	AddControllerYawInput(Value);
+}
+
+void ACharacterBase::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	GetWorldTimerManager().SetTimerForNextTick(this, &ACharacterBase::SetLoadoutWeaponry);
 }
 
 void ACharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -42,9 +133,26 @@ UAbilitySystemComponent* ACharacterBase::GetAbilitySystemComponent() const
 	return AbilitySystemComponent;
 }
 
+void ACharacterBase::AddWeaponToCharacter(AWeapon* NewWeapon, bool bEquipWeapon = false)
+{
+	if (GetLocalRole() < ROLE_Authority)
+	{
+		return;
+	}
+
+	CharacterCurrentWeaponry.Add(NewWeapon);
+	NewWeapon->SetOwningCharacter(this);
+	NewWeapon->AddAbilities();
+
+	if (bEquipWeapon)
+	{
+		EquipWeapon(NewWeapon);
+		ClientSyncCurrentWeapon(CurrentWeapon);
+	}
+}
+
 void ACharacterBase::AddCharacterAbilities()
 {
-	// Grant abilities, but only on the server
 	if (GetLocalRole() != ROLE_Authority || !IsValid(AbilitySystemComponent) || AbilitySystemComponent->bCharacterAbilitiesGiven)
 	{
 		return;
@@ -69,7 +177,7 @@ void ACharacterBase::RemoveCharacterAbilities()
 	TArray<FGameplayAbilitySpecHandle> AbilitiesToRemove;
 	for (const FGameplayAbilitySpec& Spec : AbilitySystemComponent->GetActivatableAbilities())
 	{
-		if ((Spec.SourceObject == this) && CharacterWeapons.Contains(Spec.Ability->GetClass()))
+		if ((Spec.SourceObject == this) && CharacterLoadoutWeaponry.Contains(Spec.Ability->GetClass()))
 		{
 			AbilitiesToRemove.Add(Spec.Handle);
 		}
@@ -83,9 +191,55 @@ void ACharacterBase::RemoveCharacterAbilities()
 	AbilitySystemComponent->bCharacterAbilitiesGiven = false;
 }
 
+void ACharacterBase::EquipWeapon(AWeapon* WeaponToEquip)
+{
+	if (GetLocalRole() < ROLE_Authority)
+	{
+		ServerEquipWeapon(WeaponToEquip);
+		SetCurrentWeapon(WeaponToEquip, CurrentWeapon);
+		bChangedWeaponLocally = true;
+	}
+	else
+	{
+		SetCurrentWeapon(WeaponToEquip, CurrentWeapon);
+	}
+}
+
+void ACharacterBase::ServerEquipWeapon_Implementation(AWeapon* WeaponToEquip)
+{
+	EquipWeapon(WeaponToEquip);
+}
+
+bool ACharacterBase::ServerEquipWeapon_Validate(AWeapon* WeaponToEquip)
+{
+	return true;
+}
+
 AWeapon* ACharacterBase::GetCurrentWeapon() const
 {
 	return CurrentWeapon;
+}
+
+void ACharacterBase::ServerSyncCurrentWeapon_Implementation()
+{
+	ClientSyncCurrentWeapon(CurrentWeapon);
+}
+
+bool ACharacterBase::ServerSyncCurrentWeapon_Validate()
+{
+	return true;
+}
+
+void ACharacterBase::ClientSyncCurrentWeapon_Implementation(AWeapon* Weapon)
+{
+	AWeapon* LastWeapon = CurrentWeapon;
+	CurrentWeapon = Weapon;
+	OnRep_CurrentWeapon(LastWeapon);
+}
+
+bool ACharacterBase::ClientSyncCurrentWeapon_Validate(AWeapon* Weapon)
+{
+	return true;
 }
 
 FName ACharacterBase::GetWeaponAttachPoint()
@@ -123,7 +277,7 @@ void ACharacterBase::Die()
 
 		AbilitySystemComponent->AddLooseGameplayTag(DeadTag);
 	}
-	
+
 	FinishDying();
 }
 
@@ -164,13 +318,13 @@ void ACharacterBase::SetCurrentWeapon(AWeapon* NewWeapon, AWeapon* LastWeapon)
 			AbilitySystemComponent->AddLooseGameplayTag(CurrentWeaponTag);
 		}
 
-		UAnimMontage* Equip1PMontage = CurrentWeapon->GetEquip1PMontage();
+		UAnimMontage* Equip1PMontage = CurrentWeapon->GetFPEquipMontage();
 		if (Equip1PMontage && GetFirstPersonMesh())
 		{
 			GetFirstPersonMesh()->GetAnimInstance()->Montage_Play(Equip1PMontage);
 		}
 
-		UAnimMontage* Equip3PMontage = CurrentWeapon->GetEquip3PMontage();
+		UAnimMontage* Equip3PMontage = CurrentWeapon->GetTPEquipMontage();
 		if (Equip3PMontage && GetThirdPersonMesh())
 		{
 			GetThirdPersonMesh()->GetAnimInstance()->Montage_Play(Equip3PMontage);
@@ -184,6 +338,13 @@ void ACharacterBase::UnequipWeapon(AWeapon* WeaponToUnequip)
 	{
 		WeaponToUnequip->Unequip();
 	}
+}
+
+void ACharacterBase::OnRep_Controller()
+{
+	Super::OnRep_Controller();
+
+	SetDefaultPlayerPerspective();
 }
 
 void ACharacterBase::OnRep_CurrentWeapon(AWeapon* LastWeapon)

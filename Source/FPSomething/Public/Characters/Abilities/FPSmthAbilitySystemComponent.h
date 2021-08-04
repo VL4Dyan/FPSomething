@@ -16,4 +16,5 @@ class FPSOMETHING_API UFPSmthAbilitySystemComponent : public UAbilitySystemCompo
 	
 public:
 	bool bCharacterAbilitiesGiven = false;
+	bool bCharacterWeaponsActivated = false;
 };

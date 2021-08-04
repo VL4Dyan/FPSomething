@@ -40,13 +40,12 @@ public:
 
 	//IAbilitySystemInterface
 	virtual class UAbilitySystemComponent* GetAbilitySystemComponent() const override;
-	//End of IAbilitySystemInterface
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "FPSomething|Weapon")
-		virtual USkeletalMeshComponent* GetWeaponMesh1P() const;
+		virtual USkeletalMeshComponent* GetFPWeaponMesh() const;
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "FPSomething|Weapon")
-		virtual USkeletalMeshComponent* GetWeaponMesh3P() const;
+		virtual USkeletalMeshComponent* GetTPWeaponMesh() const;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -87,10 +86,10 @@ public:
 		virtual void SetMaxReserveAmmo(int32 NewMaxReserveAmmo);
 
 	UFUNCTION(BlueprintCallable, Category = "FPSomething|Animation")
-		UAnimMontage* GetEquip1PMontage() const;
+		UAnimMontage* GetFPEquipMontage() const;
 
 	UFUNCTION(BlueprintCallable, Category = "FPSomething|Animation")
-		UAnimMontage* GetEquip3PMontage() const;
+		UAnimMontage* GetTPEquipMontage() const;
 
 	UFUNCTION(BlueprintCallable, Category = "FPSomething|Targeting")
 		AGATA_Trace* GetLineTraceTargetActor();
@@ -119,21 +118,16 @@ protected:
 		AGATA_Trace* LineTraceTargetActor;
 
 	UPROPERTY(VisibleAnywhere, Category = "FPSomething|Weapon")
-		USkeletalMeshComponent* WeaponMesh1P;
+		USkeletalMeshComponent* FPWeaponMesh;
 
 	UPROPERTY(VisibleAnywhere, Category = "FPSomething|Weapon")
-		USkeletalMeshComponent* WeaponMesh3P;
+		USkeletalMeshComponent* TPWeaponMesh;
 
-	// Relative Location of weapon 3P Mesh when in pickup mode
-	// 1P weapon mesh is invisible so it doesn't need one
-	UPROPERTY(EditDefaultsOnly, Category = "FPSomething|Weapon")
-		FVector WeaponMesh3PickupRelativeLocation;
-
-	// Relative Location of weapon 1P Mesh when equipped
+	// Relative Location of first person perspective weapon mesh when equipped
 	UPROPERTY(EditDefaultsOnly, Category = "FPSomething|Weapon")
 		FVector WeaponMesh1PEquippedRelativeLocation;
 
-	// Relative Location of weapon 3P Mesh when equipped
+	// Relative Location of third person perspective weapon mesh when equipped
 	UPROPERTY(EditDefaultsOnly, Category = "FPSomething|Weapon")
 		FVector WeaponMesh3PEquippedRelativeLocation;
 
@@ -146,18 +140,11 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "FPSomething|Weapon")
 		TArray<FGameplayAbilitySpecHandle> AbilitySpecHandles;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "FPSomething|Weapon")
-		FGameplayTag DefaultFireMode;
-
-	// Things like fire mode for rifle
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "FPSomething|Weapon")
-		FText DefaultStatusText;
-
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "FPSomething|Weapon")
-		UAnimMontage* Equip1PMontage;
+		UAnimMontage* FPEquipMontage;
 
 	UPROPERTY(BlueprintReadonly, EditAnywhere, Category = "FPSomething|Weapon")
-		UAnimMontage* Equip3PMontage;
+		UAnimMontage* TPEquipMontage;
 
 	// Cache tags
 	FGameplayTag WeaponPrimaryInstantAbilityTag;

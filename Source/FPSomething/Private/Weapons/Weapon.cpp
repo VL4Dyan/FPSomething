@@ -21,20 +21,17 @@ AWeapon::AWeapon()
 	MaxReserveAmmo = 0;
 	bInfiniteAmmo = false;
 
-	WeaponMesh1P = CreateDefaultSubobject<USkeletalMeshComponent>(FName("WeaponMesh1P"));
-	WeaponMesh1P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	WeaponMesh1P->CastShadow = false;
-	WeaponMesh1P->SetVisibility(false, true);
-	WeaponMesh1P->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
+	FPWeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(FName("FirstPersonWeaponMesh"));
+	FPWeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	FPWeaponMesh->CastShadow = false;
+	FPWeaponMesh->SetVisibility(false, true);
+	FPWeaponMesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
 
-	WeaponMesh3PickupRelativeLocation = FVector(0.0f, -25.0f, 0.0f);
-
-	WeaponMesh3P = CreateDefaultSubobject<USkeletalMeshComponent>(FName("WeaponMesh3P"));
-	WeaponMesh3P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	WeaponMesh3P->SetRelativeLocation(WeaponMesh3PickupRelativeLocation);
-	WeaponMesh3P->CastShadow = true;
-	WeaponMesh3P->SetVisibility(true, true);
-	WeaponMesh3P->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
+	TPWeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(FName("ThirdPersonWeaponMesh"));
+	TPWeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	TPWeaponMesh->CastShadow = true;
+	TPWeaponMesh->SetVisibility(true, true);
+	TPWeaponMesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
 
 	WeaponIsFiringTag = FGameplayTag::RequestGameplayTag("Weapon.IsFiring");
 }
@@ -44,14 +41,14 @@ UAbilitySystemComponent* AWeapon::GetAbilitySystemComponent() const
 	return AbilitySystemComponent;
 }
 
-USkeletalMeshComponent* AWeapon::GetWeaponMesh1P() const
+USkeletalMeshComponent* AWeapon::GetFPWeaponMesh() const
 {
-	return WeaponMesh1P;
+	return FPWeaponMesh;
 }
 
-USkeletalMeshComponent* AWeapon::GetWeaponMesh3P() const
+USkeletalMeshComponent* AWeapon::GetTPWeaponMesh() const
 {
-	return WeaponMesh3P;
+	return TPWeaponMesh;
 }
 
 void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -85,9 +82,9 @@ void AWeapon::SetOwningCharacter(ACharacterBase* InOwningCharacter)
 
 		if (OwningCharacter->GetCurrentWeapon() != this)
 		{
-			WeaponMesh3P->CastShadow = false;
-			WeaponMesh3P->SetVisibility(true, true);
-			WeaponMesh3P->SetVisibility(false, true);
+			TPWeaponMesh->CastShadow = false;
+			TPWeaponMesh->SetVisibility(true, true);
+			TPWeaponMesh->SetVisibility(false, true);
 		}
 	}
 	else
@@ -108,12 +105,12 @@ void AWeapon::Equip()
 
 	FName AttachPoint = OwningCharacter->GetWeaponAttachPoint();
 
-	if (WeaponMesh1P)
+	if (FPWeaponMesh)
 	{
-		WeaponMesh1P->AttachToComponent(OwningCharacter->GetFirstPersonMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, AttachPoint);
-		WeaponMesh1P->SetRelativeLocation(WeaponMesh1PEquippedRelativeLocation);
-		WeaponMesh1P->SetRelativeRotation(FRotator(0, 0, -90.0f));
-		WeaponMesh1P->SetVisibility(true, true);
+		FPWeaponMesh->AttachToComponent(OwningCharacter->GetFirstPersonMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, AttachPoint);
+		FPWeaponMesh->SetRelativeLocation(WeaponMesh1PEquippedRelativeLocation);
+		FPWeaponMesh->SetRelativeRotation(FRotator(0, 0, -90.0f));
+		FPWeaponMesh->SetVisibility(true, true);
 
 	}
 }
@@ -127,14 +124,14 @@ void AWeapon::Unequip()
 
 	// Necessary to detach so that when toggling perspective all meshes attached won't become visible.
 
-	WeaponMesh1P->DetachFromComponent(FDetachmentTransformRules::KeepRelativeTransform);
-	WeaponMesh1P->SetVisibility(false, true);
+	FPWeaponMesh->DetachFromComponent(FDetachmentTransformRules::KeepRelativeTransform);
+	FPWeaponMesh->SetVisibility(false, true);
 
-	WeaponMesh3P->DetachFromComponent(FDetachmentTransformRules::KeepRelativeTransform);
-	WeaponMesh3P->CastShadow = false;
-	WeaponMesh3P->bCastHiddenShadow = false;
-	WeaponMesh3P->SetVisibility(true, true); // Without this, the unequipped weapon's 3p shadow hangs around
-	WeaponMesh3P->SetVisibility(false, true);
+	TPWeaponMesh->DetachFromComponent(FDetachmentTransformRules::KeepRelativeTransform);
+	TPWeaponMesh->CastShadow = false;
+	TPWeaponMesh->bCastHiddenShadow = false;
+	TPWeaponMesh->SetVisibility(true, true); // Without this, the unequipped weapon's third person shadow hangs around
+	TPWeaponMesh->SetVisibility(false, true);
 }
 
 void AWeapon::AddAbilities()
@@ -178,7 +175,6 @@ void AWeapon::RemoveAbilities()
 		return;
 	}
 
-	// Remove abilities, but only on the server	
 	if (GetLocalRole() != ROLE_Authority)
 	{
 		return;
@@ -238,14 +234,14 @@ void AWeapon::SetMaxReserveAmmo(int32 NewMaxReserveAmmo)
 	OnMaxReserveAmmoChanged.Broadcast(OldMaxReserveAmmo, MaxReserveAmmo);
 }
 
-UAnimMontage* AWeapon::GetEquip1PMontage() const
+UAnimMontage* AWeapon::GetFPEquipMontage() const
 {
-	return Equip1PMontage;
+	return FPEquipMontage;
 }
 
-UAnimMontage* AWeapon::GetEquip3PMontage() const
+UAnimMontage* AWeapon::GetTPEquipMontage() const
 {
-	return Equip3PMontage;
+	return TPEquipMontage;
 }
 
 AGATA_Trace* AWeapon::GetLineTraceTargetActor()
