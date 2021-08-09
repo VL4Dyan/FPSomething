@@ -133,7 +133,7 @@ UAbilitySystemComponent* ACharacterBase::GetAbilitySystemComponent() const
 	return AbilitySystemComponent;
 }
 
-void ACharacterBase::AddWeaponToCharacter(AWeapon* NewWeapon, bool bEquipWeapon = false)
+void ACharacterBase::AddWeaponToCharacter(AWeapon* NewWeapon, bool bEquipWeapon)
 {
 	if (GetLocalRole() < ROLE_Authority)
 	{
@@ -259,7 +259,6 @@ USkeletalMeshComponent* ACharacterBase::GetThirdPersonMesh() const
 
 void ACharacterBase::Die()
 {
-	// Only runs on Server
 	RemoveCharacterAbilities();
 
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -351,4 +350,14 @@ void ACharacterBase::OnRep_CurrentWeapon(AWeapon* LastWeapon)
 {
 	bChangedWeaponLocally = false;
 	SetCurrentWeapon(CurrentWeapon, LastWeapon);
+}
+
+float ACharacterBase::GetMoveSpeed() const
+{
+	if (IsValid(AttributeSet))
+	{
+		return AttributeSet->GetMoveSpeed();
+	}
+
+	return 0.0f;
 }

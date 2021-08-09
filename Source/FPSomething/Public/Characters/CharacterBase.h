@@ -70,6 +70,10 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "FPSomething|Character")
 		USkeletalMeshComponent* GetThirdPersonMesh() const;
 
+	// Gets character's default move speed
+	UFUNCTION(BlueprintCallable)
+		float GetMoveSpeed() const;
+
 	virtual void Die();
 	UFUNCTION(BlueprintCallable)
 		virtual void FinishDying();
