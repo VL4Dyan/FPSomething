@@ -4,20 +4,27 @@
 
 #include "CoreMinimal.h"
 #include "Abilities/Tasks/AbilityTask.h"
-#include "AT_PlayMontageTask.generated.h"
+#include "AT_PlayMontageForMeshAndWaitForEvent.generated.h"
 
 class UFPSmthAbilitySystemComponent;
 
 /** Delegate type used, EventTag and Payload may be empty if it came from the montage callbacks */
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPlayMontageDelegate, FGameplayTag, EventTag, FGameplayEventData, EventData);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPlayMontageForMeshAndWaitForEventDelegate, FGameplayTag, EventTag, FGameplayEventData, EventData);
 
+/**
+ * This task combines PlayMontageAndWait and WaitForEvent into one task, so you can wait for multiple types of activations such as from a melee combo
+ * Much of this code is copied from one of those two ability tasks
+ * This is a good task to look at as an example when creating game-specific tasks
+ * It is expected that each game will have a set of game-specific tasks to do what they want
+ */
 UCLASS()
-class FPSOMETHING_API UAT_PlayMontageTask : public UAbilityTask
+class FPSOMETHING_API UAT_PlayMontageForMeshAndWaitForEvent : public UAbilityTask
 {
 	GENERATED_BODY()
 
 public:
-	UAT_PlayMontageTask(const FObjectInitializer& ObjectInitializer);
+	// Constructor and overrides
+	UAT_PlayMontageForMeshAndWaitForEvent(const FObjectInitializer& ObjectInitializer);
 
 	/**
 	* The Blueprint node for this task, PlayMontageAndWaitForEvent, has some black magic from the plugin that automagically calls Activate()
@@ -30,23 +37,23 @@ public:
 
 	/** The montage completely finished playing */
 	UPROPERTY(BlueprintAssignable)
-		FPlayMontageDelegate OnCompleted;
+		FPlayMontageForMeshAndWaitForEventDelegate OnCompleted;
 
 	/** The montage started blending out */
 	UPROPERTY(BlueprintAssignable)
-		FPlayMontageDelegate OnBlendOut;
+		FPlayMontageForMeshAndWaitForEventDelegate OnBlendOut;
 
 	/** The montage was interrupted */
 	UPROPERTY(BlueprintAssignable)
-		FPlayMontageDelegate OnInterrupted;
+		FPlayMontageForMeshAndWaitForEventDelegate OnInterrupted;
 
 	/** The ability task was explicitly cancelled by another ability */
 	UPROPERTY(BlueprintAssignable)
-		FPlayMontageDelegate OnCancelled;
+		FPlayMontageForMeshAndWaitForEventDelegate OnCancelled;
 
 	/** One of the triggering gameplay events happened */
 	UPROPERTY(BlueprintAssignable)
-		FPlayMontageDelegate EventReceived;
+		FPlayMontageForMeshAndWaitForEventDelegate EventReceived;
 
 	/**
 	 * Play a montage and wait for it end. If a gameplay event happens that matches EventTags (or EventTags is empty), the EventReceived delegate will fire with a tag and event data.
@@ -62,17 +69,25 @@ public:
 	 * @param AnimRootMotionTranslationScale Change to modify size of root motion or set to 0 to block it entirely
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Ability|Tasks", meta = (HidePin = "OwningAbility", DefaultToSelf = "OwningAbility", BlueprintInternalUseOnly = "TRUE"))
-		static UAT_PlayMontageTask* PlayMontageTask(
+		static UAT_PlayMontageForMeshAndWaitForEvent* PlayMontageForMeshAndWaitForEvent(
 			UGameplayAbility* OwningAbility,
 			FName TaskInstanceName,
+			USkeletalMeshComponent* Mesh,
 			UAnimMontage* MontageToPlay,
 			FGameplayTagContainer EventTags,
 			float Rate = 1.f,
 			FName StartSection = NAME_None,
 			bool bStopWhenAbilityEnds = true,
-			float AnimRootMotionTranslationScale = 1.f);
+			float AnimRootMotionTranslationScale = 1.f,
+			bool bReplicateMontage = true,
+			float OverrideBlendOutTimeForCancelAbility = -1.f,
+			float OverrideBlendOutTimeForStopWhenEndAbility = -1.f);
 
 private:
+	// Mesh that the Montage is playing on. Must be owned by the AvatarActor.
+	UPROPERTY()
+		USkeletalMeshComponent* Mesh;
+
 	/** Montage that is playing */
 	UPROPERTY()
 		UAnimMontage* MontageToPlay;
@@ -97,8 +112,17 @@ private:
 	UPROPERTY()
 		bool bStopWhenAbilityEnds;
 
+	UPROPERTY()
+		bool bReplicateMontage;
+
+	UPROPERTY()
+		float OverrideBlendOutTimeForCancelAbility;
+
+	UPROPERTY()
+		float OverrideBlendOutTimeForStopWhenEndAbility;
+
 	/** Checks if the ability is playing a montage and stops that montage, returns true if a montage was stopped, false if not. */
-	bool StopPlayingMontage();
+	bool StopPlayingMontage(float OverrideBlendOutTime = -1.f);
 
 	/** Returns our ability system component */
 	UFPSmthAbilitySystemComponent* GetTargetASC();

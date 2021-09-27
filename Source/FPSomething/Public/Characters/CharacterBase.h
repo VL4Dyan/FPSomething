@@ -16,6 +16,7 @@ class UCameraComponent;
 class UAbilitySystemComponent;
 class UFPSmthGameplayAbility;
 class UFPSmthAbilitySystemComponent;
+class UAttributeSetBase;
 
 UCLASS()
 class FPSOMETHING_API ACharacterBase : public ACharacter, public IAbilitySystemInterface
@@ -39,29 +40,18 @@ public:
 	virtual void AddCharacterAbilities();
 	virtual void RemoveCharacterAbilities();
 
+	virtual void RespondToHealthModification(const FOnAttributeChangeData& Data);
+
 	UFUNCTION(BlueprintCallable)
 		void AddWeaponToCharacter(AWeapon* NewWeapon, bool bEquipWeapon = false);
-
 	UFUNCTION(BlueprintCallable)
-		void EquipWeapon(AWeapon* WeaponToEquip);
-
-	UFUNCTION(Server, Reliable)
-		void ServerEquipWeapon(AWeapon* WeaponToEquip);
-	void ServerEquipWeapon_Implementation(AWeapon* WeaponToEquip);
-	bool ServerEquipWeapon_Validate(AWeapon* WeaponToEquip);
-
+		void EquipFirstWeapon();
+	UFUNCTION(BlueprintCallable)
+		void EquipNextWeapon();
+	UFUNCTION(BlueprintCallable)
+		void EquipPreviousWeapon();
 	UFUNCTION(BlueprintCallable)
 		AWeapon* GetCurrentWeapon() const;
-
-	UFUNCTION(Server, Reliable)
-		void ServerSyncCurrentWeapon();
-	void ServerSyncCurrentWeapon_Implementation();
-	bool ServerSyncCurrentWeapon_Validate();
-
-	UFUNCTION(Client, Reliable)
-		void ClientSyncCurrentWeapon(AWeapon* Weapon);
-	void ClientSyncCurrentWeapon_Implementation(AWeapon* Weapon);
-	bool ClientSyncCurrentWeapon_Validate(AWeapon* Weapon);
 
 	FName GetWeaponAttachPoint();
 
@@ -79,7 +69,7 @@ public:
 		virtual void FinishDying();
 
 protected:
-	bool ASCInputBound = false;
+	bool bASCInputBound = false;
 	bool bChangedWeaponLocally;
 
 	FGameplayTag WeaponAbilityTag;
@@ -92,19 +82,29 @@ protected:
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "FPSomething|Camera")
 		UCameraComponent* FPCamera;
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-		USkeletalMeshComponent* FirstPersonMesh;
+		USkeletalMeshComponent* FPMesh;
 	UPROPERTY()
 		UFPSmthAbilitySystemComponent* AbilitySystemComponent;
 	UPROPERTY()
 		UAttributeSetBase* AttributeSet;
 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "FPSomething|Weapons")
+	//Weaponry character spawns with
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "FPSomething|Gear")
 		TArray<TSubclassOf<AWeapon>> CharacterLoadoutWeaponry;
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "FPSomething|Abilities")
+	//Any abilities related to class
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "FPSomething|Class")
 		TArray<TSubclassOf<UFPSmthGameplayAbility>> CharacterAbilities;
+	//Attributes that define class
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "FPSomething|Class")
+		TSubclassOf<class UGameplayEffect> DefaultAttributes;
 
+	//Weaponry character currently holds
 	UPROPERTY()
 		TArray<AWeapon*> CharacterCurrentWeaponry;
+
+	virtual void BeginPlay() override;
+
+	virtual void InitializeAttributes();
 
 	virtual void PostInitializeComponents() override;
 
@@ -115,13 +115,22 @@ protected:
 	void MoveRight(float Value);
 	void LookUp(float Value);
 	void Turn(float Value);
+	void BindASCInput();
+
+	UFUNCTION(Server, Reliable)
+		void Server_EquipWeapon(AWeapon* WeaponToEquip);
+	UFUNCTION(Server, Reliable)
+		void Server_SyncCurrentWeapon();
+	UFUNCTION(Client, Reliable)
+		void Client_SyncCurrentWeapon(AWeapon* Weapon);
+
+	void SetCurrentWeapon(AWeapon* NewWeapon, AWeapon* LastWeapon);
+	void EquipWeapon(AWeapon* WeaponToEquip);
+	void UnequipWeapon(AWeapon* WeaponToUnequip);
 
 	UFUNCTION()
 		void OnRep_CurrentWeapon(AWeapon* LastWeapon);
 
 	virtual void OnRep_Controller() override;
-
-	void SetCurrentWeapon(AWeapon* NewWeapon, AWeapon* LastWeapon);
-
-	void UnequipWeapon(AWeapon* WeaponToUnequip);
+	virtual void OnRep_PlayerState() override;
 };

@@ -7,6 +7,7 @@
 #include "AbilitySystemInterface.h"
 #include "GameplayTagContainer.h"
 #include "GameplayAbilitySpec.h"
+#include "Weapons/Equipment.h"
 #include "../FPSomething.h"
 #include "Weapon.generated.h"
 
@@ -19,132 +20,75 @@ class UFPSmthGameplayAbility;
 class ACharacterBase;
 
 UCLASS()
-class FPSOMETHING_API AWeapon : public AActor, public IAbilitySystemInterface
+class FPSOMETHING_API AWeapon : public AEquipment
 {
 	GENERATED_BODY()
 
 public:
 	AWeapon();
 
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "FPSomething|Weapon")
-		FGameplayTag WeaponTag;
-
 	UPROPERTY(BlueprintAssignable, Category = "FPSomething|Weapon")
-		FWeaponAmmoChangedDelegate OnClipAmmoChanged;
+		FWeaponAmmoChangedDelegate OnLoadedAmmoChanged;
 	UPROPERTY(BlueprintAssignable, Category = "FPSomething|Weapon")
-		FWeaponAmmoChangedDelegate OnReserveAmmoChanged;
+		FWeaponAmmoChangedDelegate OnCarriedAmmoChanged;
 	UPROPERTY(BlueprintAssignable, Category = "FPSomething|Weapon")
-		FWeaponAmmoChangedDelegate OnMaxClipAmmoChanged;
+		FWeaponAmmoChangedDelegate OnMaxLoadedAmmoChanged;
 	UPROPERTY(BlueprintAssignable, Category = "FPSomething|Weapon")
-		FWeaponAmmoChangedDelegate OnMaxReserveAmmoChanged;
-
-	//IAbilitySystemInterface
-	virtual class UAbilitySystemComponent* GetAbilitySystemComponent() const override;
-
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "FPSomething|Weapon")
-		virtual USkeletalMeshComponent* GetFPWeaponMesh() const;
-
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "FPSomething|Weapon")
-		virtual USkeletalMeshComponent* GetTPWeaponMesh() const;
+		FWeaponAmmoChangedDelegate OnMaxCarriedAmmoChanged;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual void PreReplication(IRepChangedPropertyTracker& ChangedPropertyTracker) override;
 
-	void SetOwningCharacter(ACharacterBase* InOwningCharacter);
-
 	virtual void Equip();
 
 	virtual void Unequip();
 
-	virtual void AddAbilities();
-
-	virtual void RemoveAbilities();
+	UFUNCTION(BlueprintCallable, Category = "FPSomething|Weapon")
+		virtual int32 GetLoadedAmmo() const;
 
 	UFUNCTION(BlueprintCallable, Category = "FPSomething|Weapon")
-		virtual int32 GetClipAmmo() const;
+		virtual int32 GetMaxLoadedAmmo() const;
 
 	UFUNCTION(BlueprintCallable, Category = "FPSomething|Weapon")
-		virtual int32 GetMaxClipAmmo() const;
+		virtual int32 GetCarriedAmmo() const;
 
 	UFUNCTION(BlueprintCallable, Category = "FPSomething|Weapon")
-		virtual int32 GetReserveAmmo() const;
+		virtual int32 GetMaxCarriedAmmo() const;
 
 	UFUNCTION(BlueprintCallable, Category = "FPSomething|Weapon")
-		virtual int32 GetMaxReserveAmmo() const;
+		virtual void SetLoadedAmmo(int32 NewClipAmmo);
 
 	UFUNCTION(BlueprintCallable, Category = "FPSomething|Weapon")
-		virtual void SetClipAmmo(int32 NewClipAmmo);
+		virtual void SetMaxLoadedAmmo(int32 NewMaxClipAmmo);
 
 	UFUNCTION(BlueprintCallable, Category = "FPSomething|Weapon")
-		virtual void SetMaxClipAmmo(int32 NewMaxClipAmmo);
+		virtual void SetCarriedAmmo(int32 NewReserveAmmo);
 
 	UFUNCTION(BlueprintCallable, Category = "FPSomething|Weapon")
-		virtual void SetReserveAmmo(int32 NewReserveAmmo);
-
-	UFUNCTION(BlueprintCallable, Category = "FPSomething|Weapon")
-		virtual void SetMaxReserveAmmo(int32 NewMaxReserveAmmo);
-
-	UFUNCTION(BlueprintCallable, Category = "FPSomething|Animation")
-		UAnimMontage* GetFPEquipMontage() const;
-
-	UFUNCTION(BlueprintCallable, Category = "FPSomething|Animation")
-		UAnimMontage* GetTPEquipMontage() const;
+		virtual void SetMaxCarriedAmmo(int32 NewMaxReserveAmmo);
 
 	UFUNCTION(BlueprintCallable, Category = "FPSomething|Targeting")
 		AGATA_Trace* GetLineTraceTargetActor();
 
 protected:
-	UPROPERTY()
-		UFPSmthAbilitySystemComponent* AbilitySystemComponent;
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_LoadedAmmo, Category = "FPSomething|Weapon|Ammo")
+		int32 LoadedAmmo;
 
-	// How much ammo in the clip the gun starts with
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_ClipAmmo, Category = "FPSomething|Weapon|Ammo")
-		int32 ClipAmmo;
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_MaxLoadedAmmo, Category = "FPSomething|Weapon|Ammo")
+		int32 MaxLoadedAmmo;
 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_MaxClipAmmo, Category = "FPSomething|Weapon|Ammo")
-		int32 MaxClipAmmo;
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_CarriedAmmo, Category = "FPSomething|Weapon|Ammo")
+		int32 CarriedAmmo;
 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_ReserveAmmo, Category = "FPSomething|Weapon|Ammo")
-		int32 ReserveAmmo;
-
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_MaxReserveAmmo, Category = "FPSomething|Weapon|Ammo")
-		int32 MaxReserveAmmo;
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, ReplicatedUsing = OnRep_MaxCarriedAmmo, Category = "FPSomething|Weapon|Ammo")
+		int32 MaxCarriedAmmo;
 
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "FPSomething|Weapon|Ammo")
 		bool bInfiniteAmmo;
 
 	UPROPERTY()
 		AGATA_Trace* LineTraceTargetActor;
-
-	UPROPERTY(VisibleAnywhere, Category = "FPSomething|Weapon")
-		USkeletalMeshComponent* FPWeaponMesh;
-
-	UPROPERTY(VisibleAnywhere, Category = "FPSomething|Weapon")
-		USkeletalMeshComponent* TPWeaponMesh;
-
-	// Relative Location of first person perspective weapon mesh when equipped
-	UPROPERTY(EditDefaultsOnly, Category = "FPSomething|Weapon")
-		FVector WeaponMesh1PEquippedRelativeLocation;
-
-	// Relative Location of third person perspective weapon mesh when equipped
-	UPROPERTY(EditDefaultsOnly, Category = "FPSomething|Weapon")
-		FVector WeaponMesh3PEquippedRelativeLocation;
-
-	UPROPERTY(BlueprintReadOnly, Replicated, Category = "FPSomething|Weapon")
-		ACharacterBase* OwningCharacter;
-
-	UPROPERTY(EditAnywhere, Category = "FPSomething|Weapon")
-		TArray<TSubclassOf<UFPSmthGameplayAbility>> Abilities;
-
-	UPROPERTY(BlueprintReadOnly, Category = "FPSomething|Weapon")
-		TArray<FGameplayAbilitySpecHandle> AbilitySpecHandles;
-
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "FPSomething|Weapon")
-		UAnimMontage* FPEquipMontage;
-
-	UPROPERTY(BlueprintReadonly, EditAnywhere, Category = "FPSomething|Weapon")
-		UAnimMontage* TPEquipMontage;
 
 	// Cache tags
 	FGameplayTag WeaponPrimaryInstantAbilityTag;
@@ -155,14 +99,14 @@ protected:
 	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override;
 
 	UFUNCTION()
-		virtual void OnRep_ClipAmmo(int32 OldClipAmmo);
+		virtual void OnRep_LoadedAmmo(int32 OldClipAmmo);
 
 	UFUNCTION()
-		virtual void OnRep_MaxClipAmmo(int32 OldMaxClipAmmo);
+		virtual void OnRep_MaxLoadedAmmo(int32 OldMaxClipAmmo);
 
 	UFUNCTION()
-		virtual void OnRep_ReserveAmmo(int32 OldReserveAmmo);
+		virtual void OnRep_CarriedAmmo(int32 OldReserveAmmo);
 
 	UFUNCTION()
-		virtual void OnRep_MaxReserveAmmo(int32 OldMaxReserveAmmo);
+		virtual void OnRep_MaxCarriedAmmo(int32 OldMaxReserveAmmo);
 };

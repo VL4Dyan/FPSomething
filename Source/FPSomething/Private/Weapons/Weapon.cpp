@@ -15,84 +15,31 @@ AWeapon::AWeapon()
 	bReplicates = true;
 	bNetUseOwnerRelevancy = true;
 	NetUpdateFrequency = 100.0f;
-	ClipAmmo = 0;
-	MaxClipAmmo = 0;
-	ReserveAmmo = 0;
-	MaxReserveAmmo = 0;
+	LoadedAmmo = 0;
+	MaxLoadedAmmo = 0;
+	CarriedAmmo = 0;
+	MaxCarriedAmmo = 0;
 	bInfiniteAmmo = false;
 
-	FPWeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(FName("FirstPersonWeaponMesh"));
-	FPWeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	FPWeaponMesh->CastShadow = false;
-	FPWeaponMesh->SetVisibility(false, true);
-	FPWeaponMesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
-
-	TPWeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(FName("ThirdPersonWeaponMesh"));
-	TPWeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	TPWeaponMesh->CastShadow = true;
-	TPWeaponMesh->SetVisibility(true, true);
-	TPWeaponMesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
-
 	WeaponIsFiringTag = FGameplayTag::RequestGameplayTag("Weapon.IsFiring");
-}
-
-UAbilitySystemComponent* AWeapon::GetAbilitySystemComponent() const
-{
-	return AbilitySystemComponent;
-}
-
-USkeletalMeshComponent* AWeapon::GetFPWeaponMesh() const
-{
-	return FPWeaponMesh;
-}
-
-USkeletalMeshComponent* AWeapon::GetTPWeaponMesh() const
-{
-	return TPWeaponMesh;
 }
 
 void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME_CONDITION(AWeapon, OwningCharacter, COND_OwnerOnly);
-	DOREPLIFETIME_CONDITION(AWeapon, ClipAmmo, COND_OwnerOnly);
-	DOREPLIFETIME_CONDITION(AWeapon, MaxClipAmmo, COND_OwnerOnly);
-	DOREPLIFETIME_CONDITION(AWeapon, ReserveAmmo, COND_OwnerOnly);
-	DOREPLIFETIME_CONDITION(AWeapon, MaxReserveAmmo, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AWeapon, LoadedAmmo, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AWeapon, MaxLoadedAmmo, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AWeapon, CarriedAmmo, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AWeapon, MaxCarriedAmmo, COND_OwnerOnly);
 }
 
 void AWeapon::PreReplication(IRepChangedPropertyTracker& ChangedPropertyTracker)
 {
 	Super::PreReplication(ChangedPropertyTracker);
 
-	DOREPLIFETIME_ACTIVE_OVERRIDE(AWeapon, ClipAmmo, (IsValid(AbilitySystemComponent) && !AbilitySystemComponent->HasMatchingGameplayTag(WeaponIsFiringTag)));
-	DOREPLIFETIME_ACTIVE_OVERRIDE(AWeapon, ReserveAmmo, (IsValid(AbilitySystemComponent) && !AbilitySystemComponent->HasMatchingGameplayTag(WeaponIsFiringTag)));
-}
-
-void AWeapon::SetOwningCharacter(ACharacterBase* InOwningCharacter)
-{
-	OwningCharacter = InOwningCharacter;
-	if (OwningCharacter)
-	{
-		// Called when added to inventory
-		AbilitySystemComponent = Cast<UFPSmthAbilitySystemComponent>(OwningCharacter->GetAbilitySystemComponent());
-		SetOwner(InOwningCharacter);
-		AttachToComponent(OwningCharacter->GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
-
-		if (OwningCharacter->GetCurrentWeapon() != this)
-		{
-			TPWeaponMesh->CastShadow = false;
-			TPWeaponMesh->SetVisibility(true, true);
-			TPWeaponMesh->SetVisibility(false, true);
-		}
-	}
-	else
-	{
-		AbilitySystemComponent = nullptr;
-		SetOwner(nullptr);
-		DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-	}
+	DOREPLIFETIME_ACTIVE_OVERRIDE(AWeapon, LoadedAmmo, (IsValid(AbilitySystemComponent) && !AbilitySystemComponent->HasMatchingGameplayTag(WeaponIsFiringTag)));
+	DOREPLIFETIME_ACTIVE_OVERRIDE(AWeapon, CarriedAmmo, (IsValid(AbilitySystemComponent) && !AbilitySystemComponent->HasMatchingGameplayTag(WeaponIsFiringTag)));
 }
 
 void AWeapon::Equip()
@@ -134,114 +81,52 @@ void AWeapon::Unequip()
 	TPWeaponMesh->SetVisibility(false, true);
 }
 
-void AWeapon::AddAbilities()
+int32 AWeapon::GetLoadedAmmo() const
 {
-	if (!IsValid(OwningCharacter) || !OwningCharacter->GetAbilitySystemComponent())
-	{
-		return;
-	}
-
-	UFPSmthAbilitySystemComponent* ASC = Cast<UFPSmthAbilitySystemComponent>(OwningCharacter->GetAbilitySystemComponent());
-
-	if (!ASC)
-	{
-		return;
-	}
-
-	// Grant abilities, but only on the server	
-	if (GetLocalRole() != ROLE_Authority)
-	{
-		return;
-	}
-
-	for (TSubclassOf<UFPSmthGameplayAbility>& Ability : Abilities)
-	{
-		AbilitySpecHandles.Add(ASC->GiveAbility(
-			FGameplayAbilitySpec(Ability, 1, static_cast<int32>(Ability.GetDefaultObject()->AbilityInputID), this)));
-	}
+	return LoadedAmmo;
 }
 
-void AWeapon::RemoveAbilities()
+int32 AWeapon::GetMaxLoadedAmmo() const
 {
-	if (!IsValid(OwningCharacter) || !OwningCharacter->GetAbilitySystemComponent())
-	{
-		return;
-	}
-
-	UFPSmthAbilitySystemComponent* ASC = Cast<UFPSmthAbilitySystemComponent>(OwningCharacter->GetAbilitySystemComponent());
-
-	if (!ASC)
-	{
-		return;
-	}
-
-	if (GetLocalRole() != ROLE_Authority)
-	{
-		return;
-	}
-
-	for (FGameplayAbilitySpecHandle& SpecHandle : AbilitySpecHandles)
-	{
-		ASC->ClearAbility(SpecHandle);
-	}
+	return MaxLoadedAmmo;
 }
 
-int32 AWeapon::GetClipAmmo() const
+int32 AWeapon::GetCarriedAmmo() const
 {
-	return ClipAmmo;
+	return CarriedAmmo;
 }
 
-int32 AWeapon::GetMaxClipAmmo() const
+int32 AWeapon::GetMaxCarriedAmmo() const
 {
-	return MaxClipAmmo;
+	return MaxCarriedAmmo;
 }
 
-int32 AWeapon::GetReserveAmmo() const
+void AWeapon::SetLoadedAmmo(int32 NewClipAmmo)
 {
-	return ReserveAmmo;
+	int32 OldClipAmmo = LoadedAmmo;
+	LoadedAmmo = NewClipAmmo;
+	OnLoadedAmmoChanged.Broadcast(OldClipAmmo, LoadedAmmo);
 }
 
-int32 AWeapon::GetMaxReserveAmmo() const
+void AWeapon::SetMaxLoadedAmmo(int32 NewMaxClipAmmo)
 {
-	return MaxReserveAmmo;
+	int32 OldMaxClipAmmo = MaxLoadedAmmo;
+	MaxLoadedAmmo = NewMaxClipAmmo;
+	OnMaxLoadedAmmoChanged.Broadcast(OldMaxClipAmmo, MaxLoadedAmmo);
 }
 
-void AWeapon::SetClipAmmo(int32 NewClipAmmo)
+void AWeapon::SetCarriedAmmo(int32 NewReserveAmmo)
 {
-	int32 OldClipAmmo = ClipAmmo;
-	ClipAmmo = NewClipAmmo;
-	OnClipAmmoChanged.Broadcast(OldClipAmmo, ClipAmmo);
+	int32 OldReserveAmmo = CarriedAmmo;
+	CarriedAmmo = NewReserveAmmo;
+	OnCarriedAmmoChanged.Broadcast(OldReserveAmmo, CarriedAmmo);
 }
 
-void AWeapon::SetMaxClipAmmo(int32 NewMaxClipAmmo)
+void AWeapon::SetMaxCarriedAmmo(int32 NewMaxReserveAmmo)
 {
-	int32 OldMaxClipAmmo = MaxClipAmmo;
-	MaxClipAmmo = NewMaxClipAmmo;
-	OnMaxClipAmmoChanged.Broadcast(OldMaxClipAmmo, MaxClipAmmo);
-}
-
-void AWeapon::SetReserveAmmo(int32 NewReserveAmmo)
-{
-	int32 OldReserveAmmo = ReserveAmmo;
-	ReserveAmmo = NewReserveAmmo;
-	OnReserveAmmoChanged.Broadcast(OldReserveAmmo, ReserveAmmo);
-}
-
-void AWeapon::SetMaxReserveAmmo(int32 NewMaxReserveAmmo)
-{
-	int32 OldMaxReserveAmmo = MaxReserveAmmo;
-	MaxReserveAmmo = NewMaxReserveAmmo;
-	OnMaxReserveAmmoChanged.Broadcast(OldMaxReserveAmmo, MaxReserveAmmo);
-}
-
-UAnimMontage* AWeapon::GetFPEquipMontage() const
-{
-	return FPEquipMontage;
-}
-
-UAnimMontage* AWeapon::GetTPEquipMontage() const
-{
-	return TPEquipMontage;
+	int32 OldMaxReserveAmmo = MaxCarriedAmmo;
+	MaxCarriedAmmo = NewMaxReserveAmmo;
+	OnMaxCarriedAmmoChanged.Broadcast(OldMaxReserveAmmo, MaxCarriedAmmo);
 }
 
 AGATA_Trace* AWeapon::GetLineTraceTargetActor()
@@ -266,24 +151,24 @@ void AWeapon::EndPlay(EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
-void AWeapon::OnRep_ClipAmmo(int32 OldClipAmmo)
+void AWeapon::OnRep_LoadedAmmo(int32 OldClipAmmo)
 {
-	OnClipAmmoChanged.Broadcast(OldClipAmmo, ClipAmmo);
+	OnLoadedAmmoChanged.Broadcast(OldClipAmmo, LoadedAmmo);
 }
 
-void AWeapon::OnRep_MaxClipAmmo(int32 OldMaxClipAmmo)
+void AWeapon::OnRep_MaxLoadedAmmo(int32 OldMaxClipAmmo)
 {
-	OnMaxClipAmmoChanged.Broadcast(OldMaxClipAmmo, MaxClipAmmo);
+	OnMaxLoadedAmmoChanged.Broadcast(OldMaxClipAmmo, MaxLoadedAmmo);
 }
 
-void AWeapon::OnRep_ReserveAmmo(int32 OldReserveAmmo)
+void AWeapon::OnRep_CarriedAmmo(int32 OldReserveAmmo)
 {
-	OnReserveAmmoChanged.Broadcast(OldReserveAmmo, ReserveAmmo);
+	OnCarriedAmmoChanged.Broadcast(OldReserveAmmo, CarriedAmmo);
 }
 
-void AWeapon::OnRep_MaxReserveAmmo(int32 OldMaxReserveAmmo)
+void AWeapon::OnRep_MaxCarriedAmmo(int32 OldMaxReserveAmmo)
 {
-	OnMaxReserveAmmoChanged.Broadcast(OldMaxReserveAmmo, MaxReserveAmmo);
+	OnMaxCarriedAmmoChanged.Broadcast(OldMaxReserveAmmo, MaxCarriedAmmo);
 }
 
 

@@ -51,6 +51,11 @@ public:
 		FGameplayAttributeData MaxJumps;
 	ATTRIBUTE_ACCESSORS(UAttributeSetBase, MaxJumps)
 
+		//Temporary variable for final calculation of applied health change
+		UPROPERTY(BlueprintReadOnly, Category = "IncomingDamage")
+		FGameplayAttributeData IncomingDamage;
+	ATTRIBUTE_ACCESSORS(UAttributeSetBase, IncomingDamage)
+
 protected:
 	// Helper function to proportionally adjust the value of an attribute when it's associated max attribute changes.
 	// (i.e. When MaxHealth increases, Health increases by an amount that maintains the same percentage as before)

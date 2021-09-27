@@ -9,6 +9,7 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Net/UnrealNetwork.h"
 #include "Characters/Abilities/FPSmthAbilitySystemComponent.h"
+#include "Player/PlayerStateBase.h"
 #include "Characters/Abilities/FPSmthGameplayAbility.h"
 
 ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
@@ -17,22 +18,18 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer) :
 	PrimaryActorTick.bCanEverTick = false;
 	bChangedWeaponLocally = false;
 
-	AbilitySystemComponent = CreateDefaultSubobject<UFPSmthAbilitySystemComponent>(TEXT("Ability System Component"));
-	AbilitySystemComponent->SetIsReplicated(true);
-	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
-
 	FPCamera = CreateDefaultSubobject<UCameraComponent>(FName("FirstPersonCamera"));
 	FPCamera->SetupAttachment(RootComponent);
 	FPCamera->bUsePawnControlRotation = true;
 
-	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(FName("FirstPersonMesh"));
-	FirstPersonMesh->SetupAttachment(FPCamera);
-	FirstPersonMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	FirstPersonMesh->SetCollisionProfileName(FName("NoCollision"));
-	FirstPersonMesh->bReceivesDecals = false;
-	FirstPersonMesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
-	FirstPersonMesh->CastShadow = false;
-	FirstPersonMesh->SetVisibility(false, true);
+	FPMesh = CreateDefaultSubobject<USkeletalMeshComponent>(FName("FirstPersonMesh"));
+	FPMesh->SetupAttachment(FPCamera);
+	FPMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	FPMesh->SetCollisionProfileName(FName("NoCollision"));
+	FPMesh->bReceivesDecals = false;
+	FPMesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
+	FPMesh->CastShadow = false;
+	FPMesh->SetVisibility(false, true);
 
 	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
 	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -53,15 +50,32 @@ void ACharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	PlayerInputComponent->BindAxis("LookUp", this, &ACharacterBase::LookUp);
 	PlayerInputComponent->BindAxis("Turn", this, &ACharacterBase::Turn);
 
-	AbilitySystemComponent->BindAbilityActivationToInputComponent(InputComponent, FGameplayAbilityInputBinds(FString("ConfirmTarget"),
-		FString("CancelTarget"), FString("EAbilityInputID"), static_cast<int32>(EAbilityInputID::MainAttack), static_cast<int32>(EAbilityInputID::AltAttack)));
+	BindASCInput();
 }
 
 void ACharacterBase::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
 
+	APlayerStateBase* PS = GetPlayerState<APlayerStateBase>();
+	if (PS)
+	{
+		AbilitySystemComponent = Cast<UFPSmthAbilitySystemComponent>(PS->GetAbilitySystemComponent());
+
+		AbilitySystemComponent->InitAbilityActorInfo(PS, this);
+	}
+
 	SetDefaultPlayerPerspective();
+}
+
+void ACharacterBase::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (GetLocalRole() == ROLE_AutonomousProxy)
+	{
+		Server_SyncCurrentWeapon();
+	}
 }
 
 void ACharacterBase::SetDefaultPlayerPerspective()
@@ -70,7 +84,7 @@ void ACharacterBase::SetDefaultPlayerPerspective()
 
 	if (PC && PC->IsLocalController())
 	{
-		FirstPersonMesh->SetVisibility(true, true);
+		FPMesh->SetVisibility(true, true);
 		GetMesh()->SetVisibility(false, true);
 	}
 }
@@ -147,7 +161,65 @@ void ACharacterBase::AddWeaponToCharacter(AWeapon* NewWeapon, bool bEquipWeapon)
 	if (bEquipWeapon)
 	{
 		EquipWeapon(NewWeapon);
-		ClientSyncCurrentWeapon(CurrentWeapon);
+		Client_SyncCurrentWeapon(CurrentWeapon);
+	}
+}
+
+void ACharacterBase::EquipFirstWeapon()
+{
+	if (CharacterCurrentWeaponry.Num() < 1)
+	{
+		return;
+	}
+	
+	SetCurrentWeapon(CharacterCurrentWeaponry[0], CurrentWeapon);
+}
+
+void ACharacterBase::EquipNextWeapon()
+{
+	if (CharacterCurrentWeaponry.Num() < 2)
+	{
+		return;
+	}
+
+	int32 WeaponArrayIndex = CharacterCurrentWeaponry.Find(CurrentWeapon);
+
+	if (WeaponArrayIndex == INDEX_NONE)
+	{
+		EquipFirstWeapon();
+	}
+	else
+	{
+		WeaponArrayIndex += 1;
+		if (WeaponArrayIndex == CharacterCurrentWeaponry.Num())
+		{
+			WeaponArrayIndex = 0;
+		}
+		SetCurrentWeapon(CharacterCurrentWeaponry[WeaponArrayIndex], CurrentWeapon);
+	}
+}
+
+void ACharacterBase::EquipPreviousWeapon()
+{
+	if (CharacterCurrentWeaponry.Num() < 2)
+	{
+		return;
+	}
+
+	int32 WeaponArrayIndex = CharacterCurrentWeaponry.Find(CurrentWeapon);
+
+	if (WeaponArrayIndex == INDEX_NONE)
+	{
+		EquipFirstWeapon();
+	}
+	else
+	{
+		WeaponArrayIndex -= 1;
+		if (WeaponArrayIndex < 0)
+		{
+			WeaponArrayIndex = CharacterCurrentWeaponry.Num() - 1;
+		}
+		SetCurrentWeapon(CharacterCurrentWeaponry[WeaponArrayIndex], CurrentWeapon);
 	}
 }
 
@@ -195,7 +267,7 @@ void ACharacterBase::EquipWeapon(AWeapon* WeaponToEquip)
 {
 	if (GetLocalRole() < ROLE_Authority)
 	{
-		ServerEquipWeapon(WeaponToEquip);
+		Server_EquipWeapon(WeaponToEquip);
 		SetCurrentWeapon(WeaponToEquip, CurrentWeapon);
 		bChangedWeaponLocally = true;
 	}
@@ -205,14 +277,9 @@ void ACharacterBase::EquipWeapon(AWeapon* WeaponToEquip)
 	}
 }
 
-void ACharacterBase::ServerEquipWeapon_Implementation(AWeapon* WeaponToEquip)
+void ACharacterBase::Server_EquipWeapon_Implementation(AWeapon* WeaponToEquip)
 {
 	EquipWeapon(WeaponToEquip);
-}
-
-bool ACharacterBase::ServerEquipWeapon_Validate(AWeapon* WeaponToEquip)
-{
-	return true;
 }
 
 AWeapon* ACharacterBase::GetCurrentWeapon() const
@@ -220,26 +287,16 @@ AWeapon* ACharacterBase::GetCurrentWeapon() const
 	return CurrentWeapon;
 }
 
-void ACharacterBase::ServerSyncCurrentWeapon_Implementation()
+void ACharacterBase::Server_SyncCurrentWeapon_Implementation()
 {
-	ClientSyncCurrentWeapon(CurrentWeapon);
+	Client_SyncCurrentWeapon(CurrentWeapon);
 }
 
-bool ACharacterBase::ServerSyncCurrentWeapon_Validate()
-{
-	return true;
-}
-
-void ACharacterBase::ClientSyncCurrentWeapon_Implementation(AWeapon* Weapon)
+void ACharacterBase::Client_SyncCurrentWeapon_Implementation(AWeapon* Weapon)
 {
 	AWeapon* LastWeapon = CurrentWeapon;
 	CurrentWeapon = Weapon;
 	OnRep_CurrentWeapon(LastWeapon);
-}
-
-bool ACharacterBase::ClientSyncCurrentWeapon_Validate(AWeapon* Weapon)
-{
-	return true;
 }
 
 FName ACharacterBase::GetWeaponAttachPoint()
@@ -249,7 +306,7 @@ FName ACharacterBase::GetWeaponAttachPoint()
 
 USkeletalMeshComponent* ACharacterBase::GetFirstPersonMesh() const
 {
-	return FirstPersonMesh;
+	return FPMesh;
 }
 
 USkeletalMeshComponent* ACharacterBase::GetThirdPersonMesh() const
@@ -346,6 +403,37 @@ void ACharacterBase::OnRep_Controller()
 	SetDefaultPlayerPerspective();
 }
 
+void ACharacterBase::BindASCInput()
+{
+	if (!bASCInputBound && IsValid(AbilitySystemComponent) && IsValid(InputComponent))
+	{
+		AbilitySystemComponent->BindAbilityActivationToInputComponent(InputComponent, FGameplayAbilityInputBinds(FString("ConfirmTarget"),
+			FString("CancelTarget"), FString("EAbilityInputID"), static_cast<int32>(EAbilityInputID::MainAttack), static_cast<int32>(EAbilityInputID::AltAttack)));
+
+		bASCInputBound = true;
+	}
+}
+
+void ACharacterBase::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+
+	APlayerStateBase* PS = GetPlayerState<APlayerStateBase>();
+	if (PS)
+	{
+		// Set the ASC for clients. Server does this in PossessedBy.
+		AbilitySystemComponent = Cast<UFPSmthAbilitySystemComponent>(PS->GetAbilitySystemComponent());
+
+		// Init ASC Actor Info for clients. Server will init its ASC when it possesses a new Actor.
+		AbilitySystemComponent->InitAbilityActorInfo(PS, this);
+
+		// Bind player input to the AbilitySystemComponent. Also called in SetupPlayerInputComponent because of a potential race condition.
+		BindASCInput();
+
+		InitializeAttributes();
+	}
+}
+
 void ACharacterBase::OnRep_CurrentWeapon(AWeapon* LastWeapon)
 {
 	bChangedWeaponLocally = false;
@@ -360,4 +448,36 @@ float ACharacterBase::GetMoveSpeed() const
 	}
 
 	return 0.0f;
+}
+
+void ACharacterBase::RespondToHealthModification(const FOnAttributeChangeData& Data)
+{
+	if (Data.NewValue <= 0)
+	{
+		Die();
+	}
+}
+
+void ACharacterBase::InitializeAttributes()
+{	
+		if (!IsValid(AbilitySystemComponent))
+		{
+			return;
+		}
+
+		if (!DefaultAttributes)
+		{
+			UE_LOG(LogTemp, Error, TEXT("%s() Missing DefaultAttributes for %s. Please fill in the character's Blueprint."), *FString(__FUNCTION__), *GetName());
+			return;
+		}
+
+		// Can run on Server and Client
+		FGameplayEffectContextHandle EffectContext = AbilitySystemComponent->MakeEffectContext();
+		EffectContext.AddSourceObject(this);
+
+		FGameplayEffectSpecHandle NewHandle = AbilitySystemComponent->MakeOutgoingSpec(DefaultAttributes, 1, EffectContext);
+		if (NewHandle.IsValid())
+		{
+			FActiveGameplayEffectHandle ActiveGEHandle = AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*NewHandle.Data.Get());
+		}
 }
